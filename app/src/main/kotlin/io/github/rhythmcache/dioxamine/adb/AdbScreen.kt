@@ -622,7 +622,7 @@ fun SavedDevicesSection(vm: AdbViewModel) {
                         when (state) {
                             is ConnectionState.Connected -> "Conectado"
                             is ConnectionState.Connecting -> "Conectando..."
-                            is ConnectionState.Error -> "Error"
+                            is ConnectionState.Error -> "Falló la conexión. Toca Conectar para reintentar"
                             else -> "Desconectado"
                         },
                         style = MaterialTheme.typography.bodySmall,

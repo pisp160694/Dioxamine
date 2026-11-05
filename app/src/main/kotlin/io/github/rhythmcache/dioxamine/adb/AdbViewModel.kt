@@ -255,6 +255,7 @@ class AdbViewModel(
         val id = "$host:$portInt"
         if (devices.containsKey(id) && devices[id]?.state is ConnectionState.Connected) return
 
+        if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) } // guardar al intentar
         devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Connecting)
         viewModelScope.launch {
             try {
@@ -262,9 +263,9 @@ class AdbViewModel(
                 val identity = keyManager.getPairingIdentity()
                 val client = withContext(Dispatchers.IO) {
                     runCatching {
-                        AdbClient.connectTls(host = host, port = portInt, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 15000)
+                        AdbClient.connectTls(host = host, port = portInt, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
                     }.getOrElse {
-                        AdbClient.connectTcp(host = host, port = portInt, keyProvider = keyProvider, handshakeTimeoutMs = 15000)
+                        AdbClient.connectTcp(host = host, port = portInt, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
                     }
                 }
 
@@ -298,6 +299,7 @@ class AdbViewModel(
         val id = "$host:$port"
         if (devices.containsKey(id) && devices[id]?.state is ConnectionState.Connected) return
 
+        if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) } // guardar al intentar
         devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Connecting)
         viewModelScope.launch {
             try {
@@ -305,9 +307,9 @@ class AdbViewModel(
                 val identity = keyManager.getPairingIdentity()
                 val client = withContext(Dispatchers.IO) {
                     runCatching {
-                        AdbClient.connectTls(host = host, port = port, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 15000)
+                        AdbClient.connectTls(host = host, port = port, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
                     }.getOrElse {
-                        AdbClient.connectTcp(host = host, port = port, keyProvider = keyProvider, handshakeTimeoutMs = 15000)
+                        AdbClient.connectTcp(host = host, port = port, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
                     }
                 }
 
