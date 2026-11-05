@@ -82,11 +82,17 @@ class AdbConnection private constructor(
                 }
             }
 
-            withTimeoutOrNull(handshakeTimeoutMs) {
-                handshakeResult.await()
-            } ?: run {
+            try {
+                withTimeoutOrNull(handshakeTimeoutMs) {
+                    handshakeResult.await()
+                } ?: throw AdbException.Timeout("ADB CNXN/AUTH handshake timed out")
+            } catch (e: Exception) {
+                // recv() performs blocking socket I/O. Cancelling the coroutine
+                // alone does not reliably interrupt that read on every Android
+                // runtime, so close the transport explicitly to unblock it.
                 scope.cancel()
-                throw AdbException.Timeout("ADB CNXN/AUTH handshake timed out")
+                runCatching { transport.close() }
+                throw e
             }
 
             return AdbConnection(

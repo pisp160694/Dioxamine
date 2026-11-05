@@ -7,6 +7,7 @@ import okio.BufferedSource
 import okio.buffer
 import okio.sink
 import okio.source
+import java.net.InetSocketAddress
 import java.net.Socket
 
 class TcpPacketTransport private constructor(
@@ -20,12 +21,22 @@ class TcpPacketTransport private constructor(
             port: Int = 5555,
         ): TcpPacketTransport =
             withContext(Dispatchers.IO) {
-                val socket = Socket(host, port)
-                socket.tcpNoDelay = true
-                val source = socket.source().buffer()
-                val sink = socket.sink().buffer()
-                TcpPacketTransport(socket, source, sink)
+                val socket = Socket()
+                try {
+                    // Bound connection establishment so an unreachable TV cannot
+                    // leave the connection coroutine waiting indefinitely.
+                    socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+                    socket.tcpNoDelay = true
+                    val source = socket.source().buffer()
+                    val sink = socket.sink().buffer()
+                    TcpPacketTransport(socket, source, sink)
+                } catch (e: Exception) {
+                    runCatching { socket.close() }
+                    throw e
+                }
             }
+
+        private const val CONNECT_TIMEOUT_MS = 10_000
     }
 
     private val writeLock = Any()

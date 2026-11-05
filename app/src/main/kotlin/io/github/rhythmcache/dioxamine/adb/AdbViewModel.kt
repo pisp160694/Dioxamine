@@ -264,7 +264,8 @@ class AdbViewModel(
                 val client = withContext(Dispatchers.IO) {
                     runCatching {
                         AdbClient.connectTls(host = host, port = portInt, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
-                    }.getOrElse {
+                    }.getOrElse { tlsError ->
+                        AppLogger.i("ADB_VM", "TLS unavailable for $id; retrying with classic ADB TCP: ${tlsError.message}")
                         AdbClient.connectTcp(host = host, port = portInt, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
                     }
                 }
@@ -308,7 +309,8 @@ class AdbViewModel(
                 val client = withContext(Dispatchers.IO) {
                     runCatching {
                         AdbClient.connectTls(host = host, port = port, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
-                    }.getOrElse {
+                    }.getOrElse { tlsError ->
+                        AppLogger.i("ADB_VM", "TLS unavailable for $id; retrying with classic ADB TCP: ${tlsError.message}")
                         AdbClient.connectTcp(host = host, port = port, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
                     }
                 }

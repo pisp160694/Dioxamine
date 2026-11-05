@@ -27,6 +27,7 @@ import org.bouncycastle.tls.crypto.TlsCrypto
 import org.bouncycastle.tls.crypto.TlsCryptoParameters
 import org.bouncycastle.tls.crypto.impl.bc.BcDefaultTlsCredentialedSigner
 import org.bouncycastle.tls.crypto.impl.bc.BcTlsCrypto
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.security.SecureRandom
 import org.bouncycastle.asn1.x509.Certificate as ASN1Certificate
@@ -64,10 +65,16 @@ class TlsPacketTransport private constructor(
             identity: PairingIdentity,
         ): TlsPacketTransport =
             withContext(Dispatchers.IO) {
-                val socket = Socket(host, port)
-                socket.tcpNoDelay = true
+                val socket = Socket()
+                try {
+                    // The same endpoint is subsequently reused for the A_STLS
+                    // upgrade. A bounded connect avoids hanging the UI workflow.
+                    socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+                    socket.tcpNoDelay = true
+                    // Bound the plaintext A_STLS probe and TLS negotiation too.
+                    socket.soTimeout = HANDSHAKE_READ_TIMEOUT_MS
 
-                val crypto: TlsCrypto = sharedCrypto
+                    val crypto: TlsCrypto = sharedCrypto
                 val (certChain, privKey) = parseIdentity(crypto, identity.certPem, identity.privateKeyPem)
 
                 var capturedContext: TlsClientContext? = null
@@ -179,11 +186,24 @@ class TlsPacketTransport private constructor(
                     throw AdbException.Transport("TLS handshake failed", e)
                 }
 
+                // Once TLS is established, keep the connection alive during
+                // normal idle periods; the timeout above is only for setup.
+                socket.soTimeout = 0
                 val source = protocol.inputStream.source().buffer()
                 val sink = protocol.outputStream.sink().buffer()
 
                 TlsPacketTransport(socket, protocol, source, sink)
+                } catch (e: Exception) {
+                    // Also close on failures before TLS protocol.connect(), such
+                    // as a classic ADB CNXN response instead of A_STLS. This is
+                    // the expected probe failure on Android 7.x TCP adbd.
+                    runCatching { socket.close() }
+                    throw e
+                }
             }
+
+        private const val CONNECT_TIMEOUT_MS = 10_000
+        private const val HANDSHAKE_READ_TIMEOUT_MS = 10_000
 
         private fun isCertRejectionAlert(desc: Short): Boolean =
             when (desc) {
