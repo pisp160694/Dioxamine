@@ -2,11 +2,12 @@ package io.github.rhythmcache.dioxamine.adb
 
 import android.content.Context
 
-/** Persistent list of TCP/TLS devices ("ip:port") to restore on app start. */
+/** Persistent list of TCP devices ("ip:port"), max MAX_SAVED, oldest dropped first. */
 object SavedAdbDevices {
     private const val PREFS_NAME = "adb_saved_devices"
     private const val KEY = "devices"
     private const val DELIM = "|"
+    private const val MAX_SAVED = 5
 
     private fun prefs(c: Context) = c.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
 
@@ -18,7 +19,7 @@ object SavedAdbDevices {
         if (a.isEmpty()) return
         val cur = getAll(c)
         if (a in cur) return
-        prefs(c).edit().putString(KEY, (cur + a).joinToString(DELIM)).apply()
+        prefs(c).edit().putString(KEY, (cur + a).takeLast(MAX_SAVED).joinToString(DELIM)).apply()
     }
 
     fun remove(c: Context, address: String) {

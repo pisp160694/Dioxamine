@@ -47,6 +47,9 @@ class AdbViewModel(
     var newIp by mutableStateOf("")
     var newPort by mutableStateOf("5555")
 
+    var savedDevices by mutableStateOf<List<String>>(emptyList())
+        private set
+
     var nativeOutputs = mutableStateMapOf<String, String>()
         private set
     var runningCommands = mutableStateMapOf<String, Boolean>()
@@ -75,14 +78,8 @@ class AdbViewModel(
     private var flashPfd: ParcelFileDescriptor? = null
 
     init {
-        // Restore saved TCP/TLS devices
-        context?.let { ctx ->
-            SavedAdbDevices.getAll(ctx).forEach { addr ->
-                val (h, pStr) = parseIpAndPort(addr)
-                val port = pStr?.toIntOrNull() ?: return@forEach
-                connectTcpDirect(h, port)
-            }
-        }
+        // Load saved devices (manual connect from the UI)
+        context?.let { savedDevices = SavedAdbDevices.getAll(it) }
         // Automatically generate key pair on very first launch if no key exists
         viewModelScope.launch(Dispatchers.IO) {
             if (!keyManager.hasKey()) {
@@ -289,7 +286,7 @@ class AdbViewModel(
                     uniqueId = details.uniqueId ?: id
                 )
                 if (activeDeviceId == null) activeDeviceId = id
-                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id) }
+                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) }
             } catch (e: Exception) {
                 devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
@@ -332,7 +329,7 @@ class AdbViewModel(
                     uniqueId = details.uniqueId ?: id
                 )
                 if (activeDeviceId == null) activeDeviceId = id
-                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id) }
+                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) }
             } catch (e: Exception) {
                 devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
@@ -460,9 +457,17 @@ class AdbViewModel(
 
 
     fun removeDevice(id: String) {
-        context?.let { SavedAdbDevices.remove(it, id) }
+        context?.let { SavedAdbDevices.remove(it, id); savedDevices = SavedAdbDevices.getAll(it) }
         disconnect(id)
     }
+
+    fun connectSaved(address: String) {
+        val (h, pStr) = parseIpAndPort(address)
+        val port = pStr?.toIntOrNull() ?: return
+        connectTcpDirect(h, port)
+    }
+
+    fun forgetSaved(address: String) = removeDevice(address)
 
     fun disconnect(id: String) {
         val conn = devices[id] ?: return

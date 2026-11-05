@@ -13,7 +13,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        variant: [debug, release]
+        variant: [debug]
 
     runs-on: ubuntu-latest
 

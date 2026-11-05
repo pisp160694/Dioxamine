@@ -175,6 +175,9 @@ fun DeviceConnectorCard(vm: AdbViewModel) {
                     HorizontalDivider()
                     Spacer(Modifier.height(8.dp))
 
+                    SavedDevicesSection(vm)
+                    Spacer(Modifier.height(8.dp))
+
                     if (vm.devices.isEmpty()) {
                         Text(
                             stringResource(R.string.no_devices_added_hint),
@@ -593,5 +596,49 @@ fun RescueScreen(vm: AdbViewModel) {
             },
             dismissButton = { TextButton(onClick = { showWipeConfirm = false }) { Text(stringResource(R.string.btn_cancel)) } }
         )
+    }
+}
+
+
+@Composable
+fun SavedDevicesSection(vm: AdbViewModel) {
+    if (vm.savedDevices.isEmpty()) return
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Text(
+            "Equipos guardados",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        vm.savedDevices.forEach { addr ->
+            val state = vm.devices[addr]?.state
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(addr, style = MaterialTheme.typography.bodyMedium, fontWeight = FontWeight.Medium)
+                    Text(
+                        when (state) {
+                            is ConnectionState.Connected -> "Conectado"
+                            is ConnectionState.Connecting -> "Conectando..."
+                            is ConnectionState.Error -> "Error"
+                            else -> "Desconectado"
+                        },
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                when (state) {
+                    is ConnectionState.Connected ->
+                        Button(onClick = { vm.disconnect(addr) }) { Text("Desconectar") }
+                    is ConnectionState.Connecting ->
+                        TextButton(onClick = {}, enabled = false) { Text("Conectando...") }
+                    else ->
+                        Button(onClick = { vm.connectSaved(addr) }) { Text("Conectar") }
+                }
+                TextButton(onClick = { vm.forgetSaved(addr) }) { Text("Olvidar") }
+            }
+        }
     }
 }
