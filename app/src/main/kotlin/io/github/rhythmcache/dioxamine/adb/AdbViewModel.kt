@@ -75,6 +75,14 @@ class AdbViewModel(
     private var flashPfd: ParcelFileDescriptor? = null
 
     init {
+        // Restore saved TCP/TLS devices
+        context?.let { ctx ->
+            SavedAdbDevices.getAll(ctx).forEach { addr ->
+                val (h, pStr) = parseIpAndPort(addr)
+                val port = pStr?.toIntOrNull() ?: return@forEach
+                connectTcpDirect(h, port)
+            }
+        }
         // Automatically generate key pair on very first launch if no key exists
         viewModelScope.launch(Dispatchers.IO) {
             if (!keyManager.hasKey()) {
@@ -281,6 +289,7 @@ class AdbViewModel(
                     uniqueId = details.uniqueId ?: id
                 )
                 if (activeDeviceId == null) activeDeviceId = id
+                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id) }
             } catch (e: Exception) {
                 devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
@@ -323,6 +332,7 @@ class AdbViewModel(
                     uniqueId = details.uniqueId ?: id
                 )
                 if (activeDeviceId == null) activeDeviceId = id
+                if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id) }
             } catch (e: Exception) {
                 devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
@@ -448,6 +458,11 @@ class AdbViewModel(
 
     fun clearPairingError() { pairingError = null }
 
+
+    fun removeDevice(id: String) {
+        context?.let { SavedAdbDevices.remove(it, id) }
+        disconnect(id)
+    }
 
     fun disconnect(id: String) {
         val conn = devices[id] ?: return

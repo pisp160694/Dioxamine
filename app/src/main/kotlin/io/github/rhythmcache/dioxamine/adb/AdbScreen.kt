@@ -428,12 +428,12 @@ fun DeviceRow(conn: DeviceConnection, vm: AdbViewModel) {
                         )
                     }
 
-                    IconButton(onClick = { vm.disconnect(conn.id) }) {
+                    IconButton(onClick = { vm.removeDevice(conn.id) }) {
                         Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cd_remove), modifier = Modifier.size(18.dp))
                     }
                 }
                 else -> {
-                    IconButton(onClick = { vm.disconnect(conn.id) }) {
+                    IconButton(onClick = { vm.removeDevice(conn.id) }) {
                         Icon(Icons.Filled.Close, contentDescription = stringResource(R.string.cd_remove), modifier = Modifier.size(18.dp))
                     }
                 }
