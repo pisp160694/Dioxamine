@@ -162,26 +162,37 @@ class ProcessManagerClient(
         }
     }
 
+
+    private suspend fun runShellCommand(command: String): String {
+        val stream = client.open("shell:$command")
+        val output = Buffer()
+        try {
+            while (true) {
+                val chunk = stream.recv() ?: break
+                output.write(chunk)
+            }
+            return output.readUtf8()
+        } finally {
+            try { stream.close() } catch (_: Exception) {}
+        }
+    }
+
     suspend fun forceStop(packageName: String): Result<Unit> = withContext(Dispatchers.IO) {
-        if (packageName.isBlank()) return@withContext Result.failure(IllegalArgumentException("Package name is blank"))
-        if (!ensureDaemonStarted()) return@withContext Result.failure(Exception("Daemon not connected"))
+        if (!packageName.matches(Regex("[A-Za-z0-9_.]+"))) {
+            return@withContext Result.failure(IllegalArgumentException("Invalid package name"))
+        }
 
         try {
-            val stream = client.open(SOCKET_NAME)
-            val out = Buffer()
-            out.writeByte(CMD_FORCE_STOP)
-            out.writeJavaUtf(packageName)
-            stream.write(out.readByteArray())
+            val output = runShellCommand(
+                "am force-stop $packageName; sleep 1; " +
+                "if pidof $packageName >/dev/null 2>&1; then " +
+                "echo __DIOX_STILL_RUNNING__; else echo __DIOX_STOPPED__; fi"
+            )
 
-            val reader = AgentStreamReader(stream)
-            val status = reader.readUnsignedByte()
-            if (status == STATUS_OK) {
-                stream.close()
+            if (output.contains("__DIOX_STOPPED__")) {
                 Result.success(Unit)
             } else {
-                val msg = reader.readUTF()
-                stream.close()
-                Result.failure(Exception(msg.ifBlank { "Force stop failed" }))
+                Result.failure(Exception("La aplicación sigue activa o no se pudo detener: $output"))
             }
         } catch (e: CancellationException) {
             throw e
@@ -191,26 +202,25 @@ class ProcessManagerClient(
     }
 
     suspend fun killPid(pid: Int, signal: Int = 9): Result<Unit> = withContext(Dispatchers.IO) {
-        if (pid <= 0) return@withContext Result.failure(IllegalArgumentException("Invalid PID: $pid"))
-        if (!ensureDaemonStarted()) return@withContext Result.failure(Exception("Daemon not connected"))
+        if (pid <= 1) {
+            return@withContext Result.failure(IllegalArgumentException("PID inválido: $pid"))
+        }
+
+        if (signal !in 1..31) {
+            return@withContext Result.failure(IllegalArgumentException("Señal inválida: $signal"))
+        }
 
         try {
-            val stream = client.open(SOCKET_NAME)
-            val out = Buffer()
-            out.writeByte(CMD_KILL_PID)
-            out.writeInt(pid)
-            out.writeInt(signal)
-            stream.write(out.readByteArray())
+            val output = runShellCommand(
+                "kill -$signal $pid 2>/dev/null; sleep 0.3; " +
+                "if kill -0 $pid 2>/dev/null; then " +
+                "echo __DIOX_STILL_RUNNING__; else echo __DIOX_KILLED__; fi"
+            )
 
-            val reader = AgentStreamReader(stream)
-            val status = reader.readUnsignedByte()
-            if (status == STATUS_OK) {
-                stream.close()
+            if (output.contains("__DIOX_KILLED__")) {
                 Result.success(Unit)
             } else {
-                val msg = reader.readUTF()
-                stream.close()
-                Result.failure(Exception(msg.ifBlank { "Kill PID failed" }))
+                Result.failure(Exception("El proceso $pid sigue activo o no se pudo terminar: $output"))
             }
         } catch (e: CancellationException) {
             throw e
@@ -218,6 +228,7 @@ class ProcessManagerClient(
             Result.failure(e)
         }
     }
+
 }
 
 private class AgentStreamReader(private val stream: AdbStream) {
