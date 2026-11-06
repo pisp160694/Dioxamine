@@ -267,16 +267,14 @@ class AdbViewModel(
         viewModelScope.launch {
             try {
                 val keyProvider = keyManager.createKeyProvider()
-                val identity = keyManager.getPairingIdentity()
                 val client = withContext(Dispatchers.IO) {
-                    runCatching {
-                        AdbClient.connectTcp(host = host, port = portInt, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
-                    }.getOrElse { classicError ->
-                        AppLogger.i("ADB_VM", "Classic ADB unavailable for $id; retrying with TLS: ${classicError.message}")
-                        AdbClient.connectTls(host = host, port = portInt, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
-                    }
+                    AdbClient.connectTcp(
+                        host = host,
+                        port = portInt,
+                        keyProvider = keyProvider,
+                        handshakeTimeoutMs = 45000
+                    )
                 }
-
                 val details = withContext(Dispatchers.IO) { fetchDeviceDetails(client) }
                 val displayLabel = details.model ?: id
 
@@ -312,16 +310,14 @@ class AdbViewModel(
         viewModelScope.launch {
             try {
                 val keyProvider = keyManager.createKeyProvider()
-                val identity = keyManager.getPairingIdentity()
                 val client = withContext(Dispatchers.IO) {
-                    runCatching {
-                        AdbClient.connectTcp(host = host, port = port, keyProvider = keyProvider, handshakeTimeoutMs = 45000)
-                    }.getOrElse { classicError ->
-                        AppLogger.i("ADB_VM", "Classic ADB unavailable for $id; retrying with TLS: ${classicError.message}")
-                        AdbClient.connectTls(host = host, port = port, keyProvider = keyProvider, identity = identity, handshakeTimeoutMs = 45000)
-                    }
+                    AdbClient.connectTcp(
+                        host = host,
+                        port = port,
+                        keyProvider = keyProvider,
+                        handshakeTimeoutMs = 45000
+                    )
                 }
-
                 val details = withContext(Dispatchers.IO) { fetchDeviceDetails(client) }
                 val displayLabel = details.model ?: if (host == "127.0.0.1") "This Device ($id)" else id
 
