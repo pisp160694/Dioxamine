@@ -128,13 +128,26 @@ class MainActivity : AppCompatActivity() {
 fun DioxamineApp(keyDir: File) {
     val context = LocalContext.current
     var selectedTab by rememberSaveable { mutableStateOf(Tab.ADB) }
-    val vm: AdbViewModel = viewModel(factory = object : androidx.lifecycle.ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return AdbViewModel(keyDir, context.applicationContext) as T
-        }
-    })
-    val fastbootVm: FastbootViewModel = viewModel()
+    val appOwner = remember(context) {
+        context.applicationContext as DioxamineApplication
+    }
+
+    val vm: AdbViewModel = remember(appOwner) {
+        androidx.lifecycle.ViewModelProvider(
+            appOwner,
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T {
+                    return AdbViewModel(keyDir, context.applicationContext) as T
+                }
+            }
+        ).get(AdbViewModel::class.java)
+    }
+
+    val fastbootVm: FastbootViewModel = remember(appOwner) {
+        androidx.lifecycle.ViewModelProvider(appOwner)
+            .get(FastbootViewModel::class.java)
+    }
     val scrcpyVm: ScrcpyViewModel = viewModel()
 
     val coroutineScope = rememberCoroutineScope()

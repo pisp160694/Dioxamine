@@ -60,12 +60,12 @@ class DioxForegroundService : Service() {
                 startForeground(
                     NOTIFICATION_ID,
                     notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE
                 )
             } else {
                 startForeground(NOTIFICATION_ID, notification)
             }
-            AppLogger.i("DioxForegroundService", "startForeground succeeded with type dataSync")
+            AppLogger.i("DioxForegroundService", "startForeground succeeded with type connectedDevice")
         }.onFailure { e ->
             AppLogger.e("DioxForegroundService", "Failed to start foreground service", e)
             isRunning = false
