@@ -30,6 +30,13 @@ class AdbViewModel(
     private val context: Context? = null
 ) : ViewModel() {
 
+    // Mantiene activo el proceso ADB cuando la aplicación pasa a segundo plano.
+    init {
+        context?.applicationContext?.let { appContext ->
+            io.github.rhythmcache.dioxamine.core.DioxForegroundService.start(appContext)
+        }
+    }
+
     private val prefs by lazy {
         context?.getSharedPreferences("settings", Context.MODE_PRIVATE)
     }
@@ -287,29 +294,11 @@ class AdbViewModel(
                     isRoot = details.isRoot,
                     uniqueId = details.uniqueId ?: id
                 )
-                if (activeDeviceId == null) activeDeviceId = id\n                syncAdbKeepAlive()
+                if (activeDeviceId == null) activeDeviceId = id
                 if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) }
             } catch (e: Exception) {
-                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))\n                syncAdbKeepAlive()
+                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
-        }
-    }
-
-
-    // Mantiene vivo el proceso mientras exista una conexión ADB activa.
-    private fun syncAdbKeepAlive() {
-        val appContext = context?.applicationContext ?: return
-        val activeCount = devices.values.count {
-            it.state is ConnectionState.Connected ||
-            it.state is ConnectionState.Connecting
-        }
-
-        if (activeCount > 0) {
-            io.github.rhythmcache.dioxamine.core.DioxForegroundService.start(appContext)
-            io.github.rhythmcache.dioxamine.core.DioxForegroundService
-                .updateDeviceCounts(appContext, activeCount, 0)
-        } else {
-            io.github.rhythmcache.dioxamine.core.DioxForegroundService.stop(appContext)
         }
     }
 
@@ -320,9 +309,6 @@ class AdbViewModel(
 
         if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) } // guardar al intentar
         devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Connecting)
-
-        syncAdbKeepAlive()
-
         viewModelScope.launch {
             try {
                 val keyProvider = keyManager.createKeyProvider()
@@ -353,10 +339,10 @@ class AdbViewModel(
                     isRoot = details.isRoot,
                     uniqueId = details.uniqueId ?: id
                 )
-                if (activeDeviceId == null) activeDeviceId = id\n                syncAdbKeepAlive()
+                if (activeDeviceId == null) activeDeviceId = id
                 if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) }
             } catch (e: Exception) {
-                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))\n                syncAdbKeepAlive()
+                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(e.message ?: "Connection failed"))
             }
         }
     }
@@ -368,7 +354,7 @@ class AdbViewModel(
         val id = "usb:$serial"
         if (devices.containsKey(id) && devices[id]?.state is ConnectionState.Connected) return
 
-        devices[id] = DeviceConnection(id, defaultLabel, DeviceTransport.USB, null, ConnectionState.Connecting)\n        syncAdbKeepAlive()
+        devices[id] = DeviceConnection(id, defaultLabel, DeviceTransport.USB, null, ConnectionState.Connecting)
         viewModelScope.launch {
             try {
                 val iface = UsbPacketTransport.findAdbInterface(device)
@@ -409,9 +395,9 @@ class AdbViewModel(
                     isRoot = details.isRoot,
                     uniqueId = details.uniqueId ?: serial
                 )
-                if (activeDeviceId == null) activeDeviceId = id\n                syncAdbKeepAlive()
+                if (activeDeviceId == null) activeDeviceId = id
             } catch (e: Exception) {
-                devices[id] = DeviceConnection(id, defaultLabel, DeviceTransport.USB, null, ConnectionState.Error(e.message ?: "USB connection failed"))\n                syncAdbKeepAlive()
+                devices[id] = DeviceConnection(id, defaultLabel, DeviceTransport.USB, null, ConnectionState.Error(e.message ?: "USB connection failed"))
             }
         }
     }
@@ -423,7 +409,7 @@ class AdbViewModel(
             return
         }
 
-        devices[id] = DeviceConnection(id, "$host:$port", DeviceTransport.TCP, null, ConnectionState.Connecting)\n        syncAdbKeepAlive()
+        devices[id] = DeviceConnection(id, "$host:$port", DeviceTransport.TCP, null, ConnectionState.Connecting)
         viewModelScope.launch {
             try {
                 val keyProvider = keyManager.createKeyProvider()
@@ -445,7 +431,7 @@ class AdbViewModel(
                     isRoot = details.isRoot,
                     uniqueId = details.uniqueId ?: id
                 )
-                if (activeDeviceId == null) activeDeviceId = id\n                syncAdbKeepAlive()
+                if (activeDeviceId == null) activeDeviceId = id
                 onResult?.invoke(true, null)
             } catch (e: io.github.rhythmcache.adb.AdbException.NotPaired) {
                 devices.remove(id)
@@ -455,7 +441,7 @@ class AdbViewModel(
                 onResult?.invoke(false, err)
             } catch (e: Exception) {
                 val errMsg = e.message ?: "TLS connection failed"
-                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(errMsg))\n                syncAdbKeepAlive()
+                devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Error(errMsg))
                 onResult?.invoke(false, errMsg)
             }
         }
