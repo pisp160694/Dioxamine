@@ -92,9 +92,13 @@ class AdbConnection private constructor(
                 // runtime, so close the transport explicitly to unblock it.
                 scope.cancel()
                 runCatching { transport.close() }
-                throw e
+                val hsTrace = hsTraces.remove(transport)?.toString().orEmpty()
+                if (e is kotlinx.coroutines.CancellationException) throw e
+                val hsMsg = "${e.message} [pasos:$hsTrace]"
+                throw (if (e is AdbException.Timeout) AdbException.Timeout(hsMsg) else AdbException.Transport(hsMsg, e))
             }
 
+            hsTraces.remove(transport)
             return AdbConnection(
                 openChannel = regChannel,
                 sharedCmdChannel = sharedCmdChannel,
@@ -139,6 +143,7 @@ class AdbConnection private constructor(
             if (!skipInitialCnxn) {
                 try {
                     transport.send(AdbPacket(AdbCmd.CNXN, ADB_VERSION, MAX_PAYLOAD, HOST_FEATURES_BYTES))
+                    hsLog(transport, "->CNXN")
                 } catch (e: Exception) {
                     handshakeResult.completeExceptionally(e)
                     return@coroutineScope
@@ -228,6 +233,24 @@ class AdbConnection private constructor(
             transport.close()
         }
 
+        private val hsTraces = java.util.concurrent.ConcurrentHashMap<Any, StringBuffer>()
+
+        private fun hsName(c: Int): String =
+            when (c) {
+                AdbCmd.CNXN -> "CNXN"
+                AdbCmd.AUTH -> "AUTH"
+                AdbCmd.STLS -> "STLS"
+                AdbCmd.OKAY -> "OKAY"
+                AdbCmd.OPEN -> "OPEN"
+                AdbCmd.CLSE -> "CLSE"
+                AdbCmd.WRTE -> "WRTE"
+                else -> "0x" + Integer.toHexString(c)
+            }
+
+        private fun hsLog(t: Any, s: String) {
+            hsTraces.getOrPut(t) { StringBuffer() }.append(" ").append(s)
+        }
+
         private suspend fun dispatch(
             pkt: AdbPacket,
             transport: PacketTransport,
@@ -239,6 +262,7 @@ class AdbConnection private constructor(
             onBannerReceived: (AdbDeviceMode, String, Int) -> Unit,
             setTriedSignature: (Boolean) -> Unit,
         ) {
+            hsLog(transport, "<-" + hsName(pkt.command) + "(" + pkt.arg0 + "," + pkt.arg1 + "," + pkt.payloadLength + ")")
             when (pkt.command) {
                 AdbCmd.AUTH ->
                     if (pkt.arg0 == AdbAuthType.TOKEN) {
@@ -247,11 +271,13 @@ class AdbConnection private constructor(
                             setTriedSignature(true)
                             val sig = AdbAuth.signToken(keyPair.private, pkt.payload)
                             transport.send(AdbPacket(AdbCmd.AUTH, AdbAuthType.SIGNATURE, 0, sig))
+                            hsLog(transport, "->AUTH_SIG")
                         } else {
                             val pubKeyBytes =
                                 keyProvider.getAdbPublicKeyBytes()
                                     ?: AdbAuth.encodePublicKeyAdb(keyPair.public as RSAPublicKey)
                             transport.send(AdbPacket(AdbCmd.AUTH, AdbAuthType.RSAPUBLICKEY, 0, pubKeyBytes))
+                            hsLog(transport, "->AUTH_PUBKEY")
                         }
                     }
 

@@ -307,6 +307,12 @@ class AdbViewModel(
 
         if (host != "127.0.0.1") context?.let { SavedAdbDevices.add(it, id); savedDevices = SavedAdbDevices.getAll(it) } // guardar al intentar
         devices[id] = DeviceConnection(id, id, DeviceTransport.TCP, null, ConnectionState.Connecting)
+
+        // Mantener vivo el proceso mientras exista una conexión ADB.
+        context?.applicationContext?.let {
+            io.github.rhythmcache.dioxamine.core.DioxForegroundService.start(it)
+        }
+
         viewModelScope.launch {
             try {
                 val keyProvider = keyManager.createKeyProvider()
